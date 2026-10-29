@@ -59,7 +59,7 @@ function CuentaRegresiva({ onSesionReiniciada, onError }) {
   if (segundos <= 0) {
     return (
       <Alert color="danger" className="d-flex justify-content-between align-items-center">
-        <span>Tu sesion expiro. Inicia una nueva para continuar con la carga.</span>
+        <span>Tu sesión expiró. Inicia una nueva para continuar con la carga.</span>
         <Button color="light" size="sm" disabled={reiniciando} onClick={manejarReinicio}>
           {reiniciando ? 'Reiniciando...' : 'Reiniciar sesión'}
         </Button>
