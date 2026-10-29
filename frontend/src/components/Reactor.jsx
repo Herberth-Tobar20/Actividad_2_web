@@ -15,8 +15,11 @@ function Reactor() {
   const [mensaje, setMensaje] = useState('');
   const [estabilizado, setEstabilizado] = useState(false);
   const [error, setError] = useState({ mensaje: '', id: 0 });
+  const [enviando, setEnviando] = useState(false);
 
-  const mostrarError = (texto) => setError({ mensaje: texto, id: error.id + 1 });
+  // forma funcional: evita quedarse con un id viejo del closure
+  const mostrarError = (texto) =>
+    setError((anterior) => ({ mensaje: texto, id: anterior.id + 1 }));
 
   const intentosFallidos = historial.filter((h) => h.resultado !== 'estabilizado').length;
 
@@ -25,22 +28,26 @@ function Reactor() {
 
     const valor = Number(numero);
     if (!Number.isInteger(valor) || valor < 1 || valor > 100) {
-      mostrarError('Ingresa un número entre 1 y 100');
+      mostrarError('Ingresa un número entero entre 1 y 100');
       return;
     }
 
+    setEnviando(true);
     try {
       const { resultado } = await enviarAjuste(valor);
-      setHistorial([...historial, { numero: valor, resultado }]);
-      setMensaje(TEXTOS[resultado]);
+      setHistorial((anteriores) => [...anteriores, { numero: valor, resultado }]);
+      setMensaje(TEXTOS[resultado] || resultado);
       setEstabilizado(resultado === 'estabilizado');
       setNumero('');
     } catch (err) {
       mostrarError(err.message);
+    } finally {
+      setEnviando(false);
     }
   };
 
   const manejarReinicio = async () => {
+    setEnviando(true);
     try {
       await reiniciarReactor();
       setHistorial([]);
@@ -49,12 +56,14 @@ function Reactor() {
       setNumero('');
     } catch (err) {
       mostrarError(err.message);
+    } finally {
+      setEnviando(false);
     }
   };
 
   return (
     <div>
-      <h5>Reactor</h5>
+      <h5 className="mb-3">Reactor</h5>
       <AlertaError key={error.id} mensaje={error.mensaje} />
 
       <Form onSubmit={manejarEnvio} className="d-flex gap-2 mb-3">
@@ -66,29 +75,36 @@ function Reactor() {
             placeholder="Ajusta el reactor (1-100)"
             value={numero}
             onChange={(e) => setNumero(e.target.value)}
-            disabled={estabilizado}
+            disabled={estabilizado || enviando}
+            aria-label="Temperatura del reactor"
           />
         </FormGroup>
-        <Button color="primary" type="submit" disabled={estabilizado}>
-          Ajustar
+        <Button color="primary" type="submit" disabled={estabilizado || enviando}>
+          {enviando ? 'Ajustando...' : 'Ajustar'}
         </Button>
-        <Button color="secondary" outline type="button" onClick={manejarReinicio}>
+        <Button color="secondary" outline type="button" disabled={enviando} onClick={manejarReinicio}>
           Reiniciar
         </Button>
       </Form>
 
       {mensaje && <Alert color={estabilizado ? 'success' : 'info'}>{mensaje}</Alert>}
 
-      <p>
+      <p className="mb-2">
         Intentos fallidos: <Badge color="dark" pill>{intentosFallidos}</Badge>
       </p>
 
       <ListGroup>
-        {historial.map((intento, indice) => (
-          <ListGroupItem key={indice}>
-            #{indice + 1} → {intento.numero} ({intento.resultado})
+        {historial.length === 0 ? (
+          <ListGroupItem className="text-muted text-center">
+            Todavia no hiciste ningun intento.
           </ListGroupItem>
-        ))}
+        ) : (
+          historial.map((intento, indice) => (
+            <ListGroupItem key={`${intento.numero}-${indice}`}>
+              #{indice + 1} → {intento.numero} ({intento.resultado})
+            </ListGroupItem>
+          ))
+        )}
       </ListGroup>
     </div>
   );
