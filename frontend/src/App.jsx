@@ -1,76 +1,86 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Container, Row, Col, Card, CardBody, CardTitle, CardText, 
-  Button, Badge, Alert, ListGroup, ListGroupItem, ButtonGroup 
+import { useEffect, useState } from 'react';
+import {
+  Container, Row, Col, Card, CardBody, CardTitle,
+  Button, Badge, Alert, Spinner
 } from 'reactstrap';
-import { 
-  getInventario, getCarga, agregarCargaAPI, 
-  actualizarUnidadesAPI, eliminarCargaAPI 
+import {
+  getInventario, getCarga, agregarCargaAPI,
+  actualizarUnidadesAPI, eliminarCargaAPI
 } from './api/reactorApi';
+import AlertaError from './components/AlertaError';
+import BodegaLateral from './components/BodegaLateral';
+import CuentaRegresiva from './components/CuentaRegresiva';
+import Reactor from './components/Reactor';
 
 function App() {
   // --- ESTADOS GENERALES (useState) ---
   const [inventario, setInventario] = useState([]);
   const [cargaData, setCargaData] = useState({ creditos: 500, itemsCargados: [], total: 0 });
-  const [errorMsg, setErrorMsg] = useState(null);
+  const [error, setError] = useState({ mensaje: '', id: 0 });
+  const [cargando, setCargando] = useState(true);
 
-  // --- CARGA INICIAL (useEffect) ---
+  // id incremental: el key hace que UncontrolledAlert se remonte en cada error
+  const mostrarError = (texto) =>
+    setError((anterior) => ({ mensaje: texto, id: anterior.id + 1 }));
+
+  // --- CARGA DE DATOS (useEffect) ---
   const cargarDatosMision = async () => {
-    try {
-      const invRes = await getInventario();
-      const cargaRes = await getCarga();
-      setInventario(invRes);
-      setCargaData(cargaRes);
-    } catch (error) {
-      setErrorMsg(error.message || "Error al conectar con la base de datos de la misión.");
-    }
+    const [inventarioRes, cargaRes] = await Promise.all([getInventario(), getCarga()]);
+    setInventario(inventarioRes);
+    setCargaData(cargaRes);
   };
 
   useEffect(() => {
-    cargarDatosMision();
+    const iniciar = async () => {
+      try {
+        await cargarDatosMision();
+      } catch (err) {
+        mostrarError(err.message || 'Error al conectar con la base de datos de la misión.');
+      } finally {
+        setCargando(false);
+      }
+    };
+
+    iniciar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- MANEJADORES DE ACCIÓN ---
-  const manejarAgregar = async (id) => {
+  // envuelve cada petición: muestra "Calculando peso...", refresca y captura el error
+  const ejecutarAccion = async (accion) => {
+    setCargando(true);
     try {
-      setErrorMsg(null);
-      await agregarCargaAPI(id, 1);
-      await cargarDatosMision(); // Refrescar stock y carga
-    } catch (error) {
-      setErrorMsg(error.message);
+      await accion();
+      await cargarDatosMision();
+    } catch (err) {
+      mostrarError(err.message);
+    } finally {
+      setCargando(false);
     }
   };
 
-  const manejarCambioUnidades = async (id, nuevaCantidad) => {
-    try {
-      setErrorMsg(null);
-      await actualizarUnidadesAPI(id, nuevaCantidad);
-      await cargarDatosMision();
-    } catch (error) {
-      setErrorMsg(error.message);
-    }
-  };
+  const manejarAgregar = (id) => ejecutarAccion(() => agregarCargaAPI(id, 1));
 
-  const manejarEliminar = async (id) => {
-    try {
-      setErrorMsg(null);
-      await eliminarCargaAPI(id);
-      await cargarDatosMision();
-    } catch (error) {
-      setErrorMsg(error.message);
-    }
-  };
+  const manejarCambioUnidades = (id, nuevaCantidad) =>
+    ejecutarAccion(() => actualizarUnidadesAPI(id, nuevaCantidad));
+
+  const manejarEliminar = (id) => ejecutarAccion(() => eliminarCargaAPI(id));
+
+  // el backend solo guarda { id, cantidad }: el nombre se toma del inventario
+const itemsBodega = cargaData.itemsCargados.map((item) => ({
+    ...item,
+    nombre: inventario.find((s) => s.id === item.id)?.nombre ?? `Suministro #${item.id}`,
+  }));
 
   return (
     <Container className="my-4">
       <h1 className="text-center mb-4">AstroLogistics Ltd. - Manifiesto de Carga</h1>
 
-      {/* Alerta de Error por Restricciones (Stock / Créditos) */}
-      {errorMsg && (
-        <Alert color="warning" toggle={() => setErrorMsg(null)}>
-          {errorMsg}
-        </Alert>
-      )}
+      {/* Alerta de error: UncontrolledAlert se remonta con cada key nueva */}
+      <AlertaError key={error.id} mensaje={error.mensaje} />
+
+      {/* Cuenta regresiva de la ventana de lanzamiento */}
+      <CuentaRegresiva onSesionReiniciada={cargarDatosMision} onError={mostrarError} />
 
       {/* PANEL SUPERIOR (Información de la Misión) */}
       <Alert color="info" className="d-flex justify-content-between align-items-center">
@@ -83,14 +93,21 @@ function App() {
         </div>
       </Alert>
 
+      {cargando && (
+        <div className="text-muted">
+          <Spinner size="sm" className="me-2" />
+          Calculando peso...
+        </div>
+      )}
+
       <Row>
         {/* CATÁLOGO DE LA BASE (Cuadrícula de Cards) */}
         <Col md="8" xs="12">
           <h3 className="mb-3">Catálogo de Suministros</h3>
           <Row>
             {inventario.map((item) => (
-              <Col md="4" xs="12" key={item.id} className="mb-3">
-                <Card className="h-100 shadow-sm">
+              <Col md="4" xs="12" key={item.id}>
+                <Card className="mb-3 h-100 shadow-sm">
                   <CardBody className="d-flex flex-column justify-content-between">
                     <div>
                       <CardTitle tag="h5">{item.nombre}</CardTitle>
@@ -106,7 +123,12 @@ function App() {
                         Agotado en Base
                       </Button>
                     ) : (
-                      <Button color="primary" size="sm" onClick={() => manejarAgregar(item.id)}>
+                      <Button
+                        color="primary"
+                        size="sm"
+                        disabled={cargando}
+                        onClick={() => manejarAgregar(item.id)}
+                      >
                         Añadir a la Nave
                       </Button>
                     )}
@@ -120,50 +142,23 @@ function App() {
         {/* BODEGA DE CARGA LATERAL (Panel Lateral) */}
         <Col md="4" xs="12">
           <h3 className="mb-3">Tu Bodega</h3>
-          <ListGroup>
-            {cargaData.itemsCargados.length === 0 ? (
-              <ListGroupItem className="text-muted text-center">La nave está vacía</ListGroupItem>
-            ) : (
-              cargaData.itemsCargados.map((itemCargado) => {
-                const suministroInfo = inventario.find(i => i.id === itemCargado.id) || {};
-                return (
-                  <ListGroupItem key={itemCargado.id} className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h6 className="mb-0">{suministroInfo.nombre || `Item #${itemCargado.id}`}</h6>
-                      <small className="text-muted">Cant: {itemCargado.cantidad}</small>
-                    </div>
-                    
-                    <div className="d-flex align-items-center gap-1">
-                      <ButtonGroup size="sm">
-                        <Button 
-                          outline 
-                          color="secondary" 
-                          onClick={() => manejarCambioUnidades(itemCargado.id, itemCargado.cantidad - 1)}
-                        >
-                          -
-                        </Button>
-                        <Button 
-                          outline 
-                          color="secondary" 
-                          onClick={() => manejarCambioUnidades(itemCargado.id, itemCargado.cantidad + 1)}
-                        >
-                          +
-                        </Button>
-                      </ButtonGroup>
-                      <Button 
-                        color="danger" 
-                        outline 
-                        size="sm" 
-                        onClick={() => manejarEliminar(itemCargado.id)}
-                      >
-                        Desembarcar
-                      </Button>
-                    </div>
-                  </ListGroupItem>
-                );
-              })
-            )}
-          </ListGroup>
+          <BodegaLateral
+            items={itemsBodega}
+            onAumentar={(item) => manejarCambioUnidades(item.id, item.cantidad + 1)}
+            onDisminuir={(item) => manejarCambioUnidades(item.id, item.cantidad - 1)}
+            onQuitar={manejarEliminar}
+          />
+        </Col>
+      </Row>
+
+      {/* ESTABILIZA EL REACTOR */}
+      <Row className="mt-4">
+        <Col md="8" xs="12">
+          <Card className="mb-3">
+            <CardBody>
+              <Reactor />
+            </CardBody>
+          </Card>
         </Col>
       </Row>
     </Container>
