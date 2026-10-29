@@ -1,4 +1,4 @@
-const USE_MOCK = true; // Cambiar a false cuando el backend real esté conectado
+const USE_MOCK = false; // true solo si se quiere probar sin backend
 const API_URL = 'http://localhost:3000';
 
 let numeroOculto = Math.floor(Math.random() * 100) + 1;
@@ -16,13 +16,13 @@ async function pedirJSON(ruta, opciones) {
 // --- ENDPOINTS EJERCICIO 1: REACTOR ---
 export async function enviarAjuste(numero) {
   if (USE_MOCK) {
-    if (numero === numeroOculto) return { resultado: 'correcto' };
-    return { resultado: numeroOculto > numero ? 'mayor' : 'menor' };
+    if (numero === numeroOculto) return { resultado: 'estabilizado' };
+    return { resultado: numeroOculto > numero ? 'más alta' : 'más baja' };
   }
-  return pedirJSON('/guess', {
+  return pedirJSON('/adjust', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ numero }),
+    body: JSON.stringify({ temperatura: numero }),
   });
 }
 
@@ -31,7 +31,7 @@ export async function reiniciarReactor() {
     numeroOculto = Math.floor(Math.random() * 100) + 1;
     return { mensaje: 'Reactor reiniciado' };
   }
-  return pedirJSON('/reset', { method: 'POST' });
+  return pedirJSON('/reboot', { method: 'POST' });
 }
 
 // --- ENDPOINTS CASO 2: ASTROLOGISTICS (TIENDA Y CARGA) ---

@@ -1,4 +1,4 @@
-// [persona 2] ejercicio 1: estabiliza el reactor
+//  ejercicio 1: estabiliza el reactor
 
 const generar_temperatura = () => Math.floor(Math.random() * 100) + 1;
 

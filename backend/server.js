@@ -3,7 +3,9 @@ import cors from 'cors';
 
 import inventarioRoutes from './src/routes/inventario.routes.js';
 import cargaRoutes from './src/routes/carga_edicion.routes.js';
-import reactorRoutes from './src/routes/reactor.routes.js';  2
+import reactorRoutes from './src/routes/reactor.routes.js';  
+import sesion_routes from './src/routes/sesion.routes.js';
+import { exigir_sesion_activa } from './src/controllers/sesion.controller.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,9 +15,9 @@ app.use(cors({ origin: ['http://localhost:5173'] }));
 app.use(express.json()); 
 
 // Rutas
-app.use('/api/inventario', inventarioRoutes);
+app.use('/api/carga', exigir_sesion_activa);
 app.use('/api/carga', cargaRoutes);
-app.use('/', reactorRoutes); 
+app.use('/api/sesion', sesion_routes);
 
 
 app.use((req, res) => {

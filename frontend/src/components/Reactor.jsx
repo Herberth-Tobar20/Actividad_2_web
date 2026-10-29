@@ -4,9 +4,9 @@ import { enviarAjuste, reiniciarReactor } from '../api/reactorApi';
 import AlertaError from './AlertaError';
 
 const TEXTOS = {
-  mayor: 'El valor correcto es mayor.',
-  menor: 'El valor correcto es menor.',
-  correcto: '¡Reactor estabilizado!',
+  'más alta': 'La temperatura ideal es más alta.',
+  'más baja': 'La temperatura ideal es más baja.',
+  estabilizado: '¡Reactor estabilizado!',
 };
 
 function Reactor() {
@@ -18,7 +18,7 @@ function Reactor() {
 
   const mostrarError = (texto) => setError({ mensaje: texto, id: error.id + 1 });
 
-  const intentosFallidos = historial.filter((h) => h.resultado !== 'correcto').length;
+  const intentosFallidos = historial.filter((h) => h.resultado !== 'estabilizado').length;
 
   const manejarEnvio = async (evento) => {
     evento.preventDefault();
@@ -33,7 +33,7 @@ function Reactor() {
       const { resultado } = await enviarAjuste(valor);
       setHistorial([...historial, { numero: valor, resultado }]);
       setMensaje(TEXTOS[resultado]);
-      setEstabilizado(resultado === 'correcto');
+      setEstabilizado(resultado === 'estabilizado');
       setNumero('');
     } catch (err) {
       mostrarError(err.message);
